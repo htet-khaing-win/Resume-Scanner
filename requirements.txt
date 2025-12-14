@@ -1,0 +1,5 @@
+PyPDF2 
+python-dotenv
+python-dateutil
+langchain
+clean-text
