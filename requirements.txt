@@ -1,5 +1,9 @@
-PyPDF2 
+PyPDF2
 python-dotenv
 python-dateutil
 langchain
 clean-text
+spacy
+Unidecode
+nltk
+numpy
