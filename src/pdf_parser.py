@@ -20,3 +20,4 @@ def extract_text_from_pdf(filepath: str) -> str:
     
 def parse_resume_pdf(pdf_path: str) -> str:
     raw_text = extract_text_from_pdf(pdf_path)
+    return raw_text
