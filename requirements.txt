@@ -7,3 +7,4 @@ spacy
 Unidecode
 nltk
 numpy
+sentence-transformers
