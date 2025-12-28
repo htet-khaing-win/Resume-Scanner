@@ -161,23 +161,81 @@ COMMON_ABBRS = {
 }
 
 section_map = {
-    # Skills
+    # SKILLS
     "skills": "skills",
     "technical skills": "skills",
     "core competencies": "skills",
+    "competencies": "skills",
+    "technologies": "skills",
+    "tech stack": "skills",
+    "technology stack": "skills",
+    "tools": "skills",
+    "languages": "skills",
+    "programming languages": "skills",
     
-    # Experience
+    # Requirements
+    "requirements": "skills",
+    "job requirements": "skills",
+    "qualifications": "skills",
+    "minimum qualifications": "skills",
+    "preferred qualifications": "skills",
+    "basic qualifications": "skills",
+    "additional qualifications": "skills",
+    "what you bring": "skills",
+    "what we are looking for": "skills",
+    "who you are": "skills",
+    "profile": "skills",
+    "candidate profile": "skills",
+
+    # EXPERIENCE 
     "experience": "experience",
     "work experience": "experience",
     "professional experience": "experience",
+    "employment history": "experience",
+    "work history": "experience",
+    "background": "experience",
+    "job history": "experience",
+    "years of experience": "experience",
+
+    # RESPONSIBILITIES
+    "responsibilities": "responsibilities",
+    "key responsibilities": "responsibilities",
+    "duties": "responsibilities",
+    "job duties": "responsibilities",
+    "what you will do": "responsibilities",
+    "what you'll do": "responsibilities",
+    "role": "responsibilities",
+    "the role": "responsibilities",
+    "scope of work": "responsibilities",
+    "day to day": "responsibilities",
+
+    # EDUCATION 
     "education": "education",
     "academic background": "education",
+    "academics": "education",
+    "degrees": "education",
+    "educational background": "education",
+    "studies": "education",
 
-    # Project
+    # PROJECTS / PORTFOLIO
     "projects": "projects",
+    "personal projects": "projects",
+    "portfolio": "projects",
+    "relevant projects": "projects",
 
-    # Certifications
+    # CERTIFICATIONS / AWARDS
     "certifications": "certifications",
+    "credentials": "certifications",
+    "licenses": "certifications",
+    "awards": "certifications",
+    "honors": "certifications",
+    
+    # BENEFITS / PERKS 
+    "benefits": "benefits",
+    "perks": "benefits",
+    "what we offer": "benefits",
+    "salary": "benefits",
+    "compensation": "benefits"
 }
 
 COMMON_SKILLS = [
@@ -292,70 +350,44 @@ def normalize_text(text: str, abbreviation_map: dict[str, str]) -> str:
 
     return text
 
-
-import re
-
-def identify_sections(text: str) -> dict[str, int]:
-    """
-    Identifies the starting character position of defined resume sections.
-    """
-    # Pattern to match all header 
-    pattern = r'\b(Skills|Technical Skills|Core Competencies|Experience|Work Experience|Professional Experience|Education|Academic Background|Projects|Certifications)\b'
+def identify_sections(text: str, current_map: dict[str, str]) -> dict[str, int]:
+    sorted_keys = sorted(current_map.keys(), key=len, reverse=True)
     
-    # Store section start positions
-    sections = {}
+    # join using sorted_keys
+    pattern = r'\b(' + '|'.join([re.escape(k) for k in sorted_keys]) + r')\b' 
     
+    found_positions = {}
     for match in re.finditer(pattern, text, flags=re.IGNORECASE):
-        header_text = match.group(0) 
-        start_position = match.start() 
+        header_text = match.group(1).lower().strip()
+        start_pos = match.start()
         
-        # Normalize the header text using the map
-        simple_key = section_map.get(header_text.lower())
-        
-        # Store the first occurrence of the section key
-        if simple_key and simple_key not in sections:
-            sections[simple_key] = start_position
+        normalized_key = current_map.get(header_text)
+
+        if normalized_key not in found_positions:
+            found_positions[normalized_key] = start_pos
             
-    sorted_sections = dict(sorted(sections.items(), key=lambda item: item[1]))
-            
-    return sorted_sections
+    return dict(sorted(found_positions.items(), key=lambda x: x[1]))
 
 def extract_section_text(text: str, section_positions: dict[str, int]) -> dict[str, str]:
-    """
-
-    Parameters:
-        text: The full (normalized) resume text.
-        section_positions: Dictionary of {section_key: start_position}.
-
-    Returns:
-        Dictionary of {section_key: content_text}.
-    """
-    extracted_content = {}
+    extracted = {}
     items = list(section_positions.items())
-    num_sections = len(items)
     
-    for i in range(num_sections):
-        current_key, start_pos = items[i]
+    for i in range(len(items)):
+        key, start = items[i]
+        end = items[i+1][1] if i < len(items) - 1 else len(text)
         
-        if i < num_sections - 1:
-            
-            next_key, end_pos = items[i+1]
-        else:
-            end_pos = len(text)
-
-        content = text[start_pos:end_pos].strip()
-        first_newline_index = content.find('\n')
-
-        if first_newline_index != -1:
-            content = content[first_newline_index:].strip()
-        else:
+        # Get the raw chunk
+        content = text[start:end].strip()
+        for original_header in section_map.keys():
+            if content.lower().startswith(original_header):
+                content = content[len(original_header):].strip()
+                # Also strip leading colons or dashes
+                content = re.sub(r'^[:\-\s]+', '', content)
+                break
+                
+        extracted[key] = content
         
-            header_text = items[i][0]
-            pass
-
-        extracted_content[current_key] = content
-        
-    return extracted_content
+    return extracted
 
 def extract_skills(skills_text: str) -> list[str]:
     """
@@ -374,54 +406,44 @@ def extract_skills(skills_text: str) -> list[str]:
     return sorted(list(found_skills))
 
 def preprocess_resume(resume_text: str) -> dict[str, any]:
-    """
-    Full preprocessing pipeline.
-    """
-    # Clean the text
-    normalized_text = clean_text(resume_text)
+    text = clean_text(resume_text)
+    text = normalize_text(text, COMMON_ABBRS)
     
-    # Normalize the text
-    normalized_text = normalize_text(normalized_text, COMMON_ABBRS)
+    # Pass the global section_map explicitly here to identify_sections
+    positions = identify_sections(text, section_map)
+    sections = extract_section_text(text, positions)
     
-    # Identify section headers and their start positions
-    section_positions = identify_sections(normalized_text)
+    # Standard resumes usually have a dedicated skills section
+    skills_content = sections.get('skills', '')
+    skills = extract_skills(skills_content)
     
-    # Extract section content
-    section_content = extract_section_text(normalized_text, section_positions)
-    
-    # Extract specific skills 
-    skills_text = section_content.get('skills', '')
-    extracted_skills = extract_skills(skills_text)
-    
-    # Return the structure
     return {
-        'cleaned_text': normalized_text,
-        'sections': section_content,
-        'extracted_skills': extracted_skills
+        'cleaned_text': text,
+        'sections': sections,
+        'extracted_skills': skills
     }
 
 def preprocess_job_description(jd_text: str) -> dict[str, any]:
-    """
-    Executes the full preprocessing pipeline on the raw Job Description.
-    """
-    # Clean the text
-    normalized_text = clean_text(jd_text)
+    text = clean_text(jd_text)
+    text = normalize_text(text, COMMON_ABBRS)
     
-    # Normalize the text 
-    normalized_text = normalize_text(normalized_text, COMMON_ABBRS)
+    # Identify where sections start
+    positions = identify_sections(text, section_map)
     
-    # Identify sections 
-    section_positions = identify_sections(normalized_text) 
+    # Extract the text between those positions
+    sections = extract_section_text(text, positions)
     
-    # Extract section content
-    section_content = extract_section_text(normalized_text, section_positions)
+    all_content = " ".join(sections.values()).strip()
     
-    # Extract skills from the JD
-    extracted_skills = extract_skills(normalized_text)
+    # If sections failed entirely, use the whole cleaned text
+    if not all_content:
+        all_content = text
+
+    # Extract skills from the large block
+    extracted_skills = extract_skills(all_content)
     
-    # Return the structure
     return {
-        'cleaned_text': normalized_text,
-        'sections': section_content, 
+        'cleaned_text': text,
+        'sections': sections, 
         'extracted_skills': extracted_skills
     }
